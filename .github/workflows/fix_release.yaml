@@ -51,6 +51,7 @@ jobs:
   fix-release:
     name: Fix Release
     runs-on: ubuntu-latest
+    needs: [lint, test]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -104,6 +105,15 @@ jobs:
             return fixNumber;
           result-encoding: string
 
+      - name: Get commits since last tag
+        id: get_commits
+        run: |
+          LAST_TAG=$(git describe --tags --abbrev=0)
+          COMMITS=$(git log --pretty=format:"- %s (%h)" $LAST_TAG..HEAD)
+          echo "commits<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMITS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
       - name: Build and tag Docker image
         run: |
           docker build -t cr.yandex/${{ env.YANDEX_CONTAINER_REGISTRY }}/app:${{ inputs.RV }}_fix${{ steps.calculate_fix.outputs.result }} .
@@ -127,15 +137,6 @@ jobs:
           git config user.email github-actions@github.com
           git tag v${{ inputs.RV }}_fix${{ steps.calculate_fix.outputs.result }}
           git push origin v${{ inputs.RV }}_fix${{ steps.calculate_fix.outputs.result }}
-
-      - name: Get commits since last tag
-        id: get_commits
-        run: |
-          LAST_TAG=$(git describe --tags --abbrev=0)
-          COMMITS=$(git log --pretty=format:"- %s (%h)" $LAST_TAG..HEAD)
-          echo "commits<<EOF" >> $GITHUB_OUTPUT
-          echo "$COMMITS" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Add fix release comment to issue
         uses: actions/github-script@v6
@@ -162,18 +163,21 @@ jobs:
             const commitList = `${{ steps.get_commits.outputs.commits }}`;
             const dockerImage = `cr.yandex/${{ env.YANDEX_CONTAINER_REGISTRY }}/app:${{ inputs.RV }}_fix${{ steps.calculate_fix.outputs.result }}`;
 
-            const commentBody = `
-            ## Fix Release Information
-            - **Date**: ${new Date().toISOString()}
-            - **Author**: **[${context.actor}](https://github.com/${context.actor})**
-            - **Fix Version**: v${{ inputs.RV }}_fix${{ steps.calculate_fix.outputs.result }}
+            let commentBody = `## Fix Release Information
+- **Date**: ${new Date().toISOString()}
+- **Author**: **[${context.actor}](https://github.com/${context.actor})**
+- **Fix Version**: v${{ inputs.RV }}_fix${{ steps.calculate_fix.outputs.result }}
 
-            ## Changes since last release:
-            ${commitList}
+## Changes since last release:\n`;
 
-            ## Link on Docker Image:
-            \`${dockerImage}\`
-            `;
+            if (commitList && commitList.trim() !== '') {
+              commentBody += `${commitList}\n\n`;
+            } else {
+              commentBody += "No new commits since last release\n\n";
+            }
+
+            commentBody += `## Link on Docker Image:
+\`${dockerImage}\``;
 
             await github.rest.issues.createComment({
               owner: context.repo.owner,
