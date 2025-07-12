@@ -52,48 +52,57 @@ jobs:
         #run: |
           ## Поиск issue по версии релиза
           #echo "issue_title=Release V${{ inputs.RV }}" >> $GITHUB_OUTPUT
-
-      - name:
+      - name: Find issue
         id: find_issue
         run: |
           ISSUE_TITLE="Release V${{ inputs.RV }}"
           echo "Looking for issue with title: $ISSUE_TITLE"
           echo "issue_title=$ISSUE_TITLE" >> $GITHUB_OUTPUT
+          echo "release_version=${{ inputs.RV }}" >> $GITHUB_OUTPUT
 
       - name: Create release comment
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const { data: issues } = await github.rest.issues.listForRepo({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'open',
-              sort: 'created',
-              direction: 'desc'
-            });
+            try {
+              const { data: issues } = await github.rest.issues.listForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'open',
+                sort: 'created',
+                direction: 'desc'
+              });
 
-            const targetIssue = issues.find(issue => 
-              issue.title.includes('${{ steps.find_issue.outputs.issue_title }}')
-            );
+              const issueTitle = '${{ steps.find_issue.outputs.issue_title }}';
+              const releaseVersion = '${{ steps.find_issue.outputs.release_version }}';
 
-            if (!targetIssue) {
-              core.setFailed('No matching issue found');
-              return;
+              const targetIssue = issues.find(issue => 
+                issue.title.includes(issueTitle)
+              );
+
+              if (!targetIssue) {
+                core.warning(`No matching issue found with title: ${issueTitle}`);
+                return;
+              }
+
+              const commentBody = `🚀 Релиз успешно задеплоен!
+              
+      **Версия**: ${releaseVersion}
+      **Дата**: ${new Date().toLocaleString('ru-RU')}
+      **Выполнил**: @${context.actor}
+      **Docker образ**: \`cr.yandex/${{ env.YANDEX_CONTAINER_REGISTRY }}/app:${releaseVersion}_latest\`
+
+      Поздравляю с успешным релизом! 🎉`;
+
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: targetIssue.number,
+                body: commentBody
+              });
+              
+              core.notice(`Successfully added comment to issue #${targetIssue.number}`);
+            } catch (error) {
+              core.error('Failed to create comment: ' + error.message);
             }
-
-            const commentBody = `🚀 Релиз успешно задеплоен!
-            
-            **Версия**: ${inputs.RV}
-            **Дата**: ${new Date().toLocaleString()}
-            **Выполнил**: @${context.actor}
-            **Docker образ**: \`cr.yandex/${{ env.YANDEX_CONTAINER_REGISTRY }}/app:${inputs.RV}_latest\`
-            
-            Поздравляю с успешным релизом! 🎉`;
-
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: targetIssue.number,
-              body: commentBody
-            });
