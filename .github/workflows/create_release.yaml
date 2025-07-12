@@ -61,25 +61,21 @@ jobs:
           git checkout -b releases/$VERSION
           git push origin releases/$VERSION
 
-      - name: Update CHANGELOG.md
-        run: |
-          # Create temporary file with new changelog entry
-          echo "## v${VERSION} — $(date)" > temp_changelog.md
-          echo "" >> temp_changelog.md
-          echo "${{ steps.commits.outputs.commits }}" >> temp_changelog.md
-          echo "" >> temp_changelog.md
+      #- name: Update CHANGELOG.md
+        #run: |
+          #echo "## v${VERSION} — $(date)" > temp_changelog.md
+          #echo "${{ steps.commits.outputs.commits }}" >> temp_changelog.md
+          #echo "" >> temp_changelog.md
 
-          # Prepend to existing changelog if it exists
-          if [ -f CHANGELOG.md ]; then
-            cat CHANGELOG.md >> temp_changelog.md
-          fi
+          #if [ -f CHANGELOG.md ]; then
+            #cat CHANGELOG.md >> temp_changelog.md
+          #fi
 
-          mv temp_changelog.md CHANGELOG.md
+          #mv temp_changelog.md CHANGELOG.md
 
-          # Commit and push changelog
-          git add CHANGELOG.md
-          git commit -m "chore: update changelog for v${VERSION}"
-          git push origin main
+          #it add CHANGELOG.md
+          #git commit -m "chore: update changelog for v${VERSION}"
+          #git push origin main
 
       - name: Build Docker Image
         run: |
@@ -145,4 +141,20 @@ jobs:
 
               `
             });
+
+      - name: Update CHANGELOG.md
+        run: |
+          echo "## v${VERSION} — $(date)" > temp_changelog.md
+          echo "${{ steps.commits.outputs.commits }}" >> temp_changelog.md
+          echo "" >> temp_changelog.md
+
+          if [ -f CHANGELOG.md ]; then
+            cat CHANGELOG.md >> temp_changelog.md
+          fi
+
+          mv temp_changelog.md CHANGELOG.md
+
+          it add CHANGELOG.md
+          git commit -m "chore: update changelog for v${VERSION}"
+          git push origin main
 
