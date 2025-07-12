@@ -2,6 +2,10 @@ name: Create a Release
 
 on:
   workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "Issue number to comment on"
+        required: true
 
 env:
   VERSION: ${{ github.run_number }}
@@ -27,7 +31,6 @@ jobs:
       - name: Run linter
         run: npm run lint
 
-
   test:
     name: Test Code
     runs-on: ubuntu-latest
@@ -49,10 +52,20 @@ jobs:
   release:
     name: New Release
     runs-on: ubuntu-latest
+    needs: [lint, test]
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Get commits since last tag
+        id: get_commits
+        run: |
+          LAST_TAG=$(git describe --tags --abbrev=0)
+          COMMITS=$(git log --pretty=format:"- %h: %s (%an)" $LAST_TAG..HEAD)
+          echo "commits<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMITS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Release Branch
         run: |
@@ -63,19 +76,9 @@ jobs:
 
       - name: Update CHANGELOG.md
         run: |
-          PREV_TAG=$(git describe --tags --abbrev=0 $VERSION^ 2>/dev/null || echo "")
-          
-          if [ -n "$PREV_TAG" ]; then
-            RANGE="$PREV_TAG..HEAD"
-          else
-            RANGE="HEAD"
-          fi
-          
-          COMMITS=$(git log $RANGE --pretty=format:'- %s (%an)')
-          
           echo "## $VERSION ($(date +'%Y-%m-%d'))" > new_changelog.md
           echo "" >> new_changelog.md
-          echo "$COMMITS" >> new_changelog.md
+          echo "${{ steps.get_commits.outputs.commits }}" >> new_changelog.md
           echo "" >> new_changelog.md
           
           if [ -f CHANGELOG.md ]; then
@@ -111,43 +114,22 @@ jobs:
           git tag v${VERSION}
           git push origin v${VERSION}
 
-      - name: Create Release Issue
+      - name: Add comment to issue
         uses: actions/github-script@v6
         with:
           script: |
-            const { data: latestRelease } = await github.rest.repos.getLatestRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo
-            }).catch(() => ({ data: null }));
-            
-            const { data: commits } = await github.rest.repos.listCommits({
+            github.rest.issues.createComment({
+              issue_number: ${{ inputs.issue_number }},
               owner: context.repo.owner,
               repo: context.repo.repo,
-              sha: latestRelease ? latestRelease.tag_name : 'main',
-              per_page: 100
-            });
+              body: `### Release Fix Details
+**Date**: ${new Date().toISOString()}
+**Author**: ${context.actor}
 
-            const commitList = commits.map(commit =>
-              `- ${commit.commit.message.split('\n')[0]} (${commit.sha.substring(0, 7)})`
-            ).join('\n');
+**Commits since last release**:
+${${{ steps.get_commits.outputs.commits }}}
 
-            await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: `Release V${process.env.VERSION}`,
-              body: `## Release Information
-              - Date: ${new Date().toISOString()}
-              - Author Release: **[${context.actor}](https://github.com/${context.actor})**
-              - Number version: v${process.env.VERSION}
-
-              ## Changes since last release:
-
-              ${commitList}
-
-
-            ## Link on Docker Image:
-            \`cr.yandex/${process.env.YANDEX_CONTAINER_REGISTRY}/app:${process.env.VERSION}\`
-
+**Docker Image**:
+\`cr.yandex/${process.env.YANDEX_CONTAINER_REGISTRY}/app:${process.env.VERSION}\`
               `
             });
-
