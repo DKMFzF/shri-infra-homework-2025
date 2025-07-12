@@ -36,7 +36,13 @@ jobs:
           username: ${{ secrets.SERVER_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            echo "${{ secrets.YANDEX_OAUTH_TOKEN }}" | sudo docker login --username oauth --password-stdin cr.yandex
+            #echo "${{ secrets.YANDEX_OAUTH_TOKEN }}" | sudo docker login --username oauth --password-stdin cr.yandex
+
+            echo "${{ YANDEX_OAUTH_TOKEN }}" | sudo docker login \
+              --username oauth \
+              --password-stdin \
+              cr.yandex
+
             sudo docker pull cr.yandex/${{ secrets.YANDEX_CONTAINER_REGISTRY }}/app:${{ github.event.inputs.RV }}_latest
             sudo docker stop app || true
             sudo docker rm app || true
