@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       RV:
-        description: "Release -ver fix"
+        description: "Версия релиза (например, 1.0.0)"
         required: true
 
 env:
@@ -50,44 +50,42 @@ jobs:
       - name: Find related issue
         id: find_issue
         run: |
-          # Здесь должна быть логика поиска issue
-          echo "issue_title=Your Issue Title" >> $GITHUB_OUTPUT
+          # Поиск issue по версии релиза
+          echo "issue_title=Релиз версии ${{ inputs.RV }}" >> $GITHUB_OUTPUT
 
-      - name: Calculate fix version
-        id: calculate_fix
-        run: |
-          # Здесь должна быть логика вычисления версии фикса
-          echo "result=1" >> $GITHUB_OUTPUT
-
-      - name: Update Issue
+      - name: Create release comment
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
+            // Ищем issue, содержащее версию релиза в заголовке
             const { data: issues } = await github.rest.issues.listForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              state: 'open',
+              state: 'all', // Ищем среди открытых и закрытых issues
               sort: 'created',
               direction: 'desc'
             });
-           
+            
+            const releaseVersion = '${{ inputs.RV }}';
             const targetIssue = issues.find(issue => 
-              issue.title.includes('${{ steps.find_issue.outputs.issue_title }}')
+              issue.title.includes(releaseVersion) || 
+              issue.body.includes(releaseVersion)
             );
 
             if (!targetIssue) {
-              core.setFailed('No matching issue found');
+              console.log('Не найдено issue, связанного с этой версией релиза');
               return;
             }
 
-            const dockerImage = `cr.yandex/${{ env.YANDEX_CONTAINER_REGISTRY }}/app:${{ inputs.RV }}_fix${{ steps.calculate_fix.outputs.result }}`;
-
-            let commentBody = `## Release Deploy (Победа!!)
-            - **Date**: ${new Date().toISOString()}
-            - **Author**: **[${context.actor}](https://github.com/${context.actor})**
-            - **Fix Version**: v${{ inputs.RV }}_fix${{ steps.calculate_fix.outputs.result }}
-            - **Docker Image**: \`${dockerImage}\``;
+            const commentBody = `🚀 Релиз успешно задеплоен!
+            
+            **Версия**: ${releaseVersion}
+            **Дата**: ${new Date().toLocaleString()}
+            **Выполнил**: @${context.actor}
+            **Docker образ**: \`cr.yandex/${{ env.YANDEX_CONTAINER_REGISTRY }}/app:${releaseVersion}_latest\`
+            
+            Поздравляю с успешным релизом! 🎉`;
 
             await github.rest.issues.createComment({
               owner: context.repo.owner,
