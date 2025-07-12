@@ -107,7 +107,7 @@ jobs:
               title: `Release V${process.env.VERSION}`,
               body: `## Release Information
               - Date: ${new Date().toISOString()}
-              - Author Release: ${context.actor}
+              - Author Release: **[${context.actor}](https://github.com/${context.actor})**
               - Number version: v${process.env.VERSION}
 
               ## Changes since last release:
