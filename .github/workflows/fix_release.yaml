@@ -10,7 +10,6 @@ on:
 env:
   YANDEX_CONTAINER_REGISTRY: ${{ secrets.YANDEX_CONTAINER_REGISTRY }}
   YANDEX_OAUTH_TOKEN: ${{ secrets.YANDEX_OAUTH_TOKEN }}
-  FIX_VERSION: ${{ github.run_number }}
 
 jobs:
   lint:
@@ -59,10 +58,59 @@ jobs:
           ref: releases/${{ inputs.RV }}
           fetch-depth: 0
       
+      - name: Find related issue
+        id: find_issue
+        run: |
+          ISSUE_TITLE="Release V${{ inputs.RV }}"
+          echo "Looking for issue with title: $ISSUE_TITLE"
+          echo "issue_title=$ISSUE_TITLE" >> $GITHUB_OUTPUT
+
+      - name: Calculate fix number for this issue
+        id: calculate_fix
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              sort: 'created',
+              direction: 'desc'
+            });
+
+            const targetIssue = issues.find(issue => 
+              issue.title.includes('${{ steps.find_issue.outputs.issue_title }}')
+            );
+
+            if (!targetIssue) {
+              core.setFailed('No matching issue found');
+              return;
+            }
+
+            // Получаем все комментарии к issue
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: targetIssue.number
+            });
+
+            // Считаем количество существующих фиксов
+            const fixComments = comments.filter(comment => 
+              comment.body.includes('Fix Version') && 
+              comment.body.includes(`v${{ inputs.RV }}_fix`)
+            );
+
+            const fixNumber = fixComments.length + 1;
+            console.log(`Calculated fix number: ${fixNumber}`);
+
+            return fixNumber;
+          result-encoding: string
+
       - name: Build and tag Docker image
         run: |
-          docker build -t cr.yandex/${{ env.YANDEX_CONTAINER_REGISTRY }}/app:${{ inputs.RV }}_fix${{ env.FIX_VERSION }} .
-          docker tag cr.yandex/${{ env.YANDEX_CONTAINER_REGISTRY }}/app:${{ inputs.RV }}_fix${{ env.FIX_VERSION }} cr.yandex/${{ env.YANDEX_CONTAINER_REGISTRY }}/app:${{ inputs.RV }}_latest
+          docker build -t cr.yandex/${{ env.YANDEX_CONTAINER_REGISTRY }}/app:${{ inputs.RV }}_fix${{ steps.calculate_fix.outputs.result }} .
+          docker tag cr.yandex/${{ env.YANDEX_CONTAINER_REGISTRY }}/app:${{ inputs.RV }}_fix${{ steps.calculate_fix.outputs.result }} cr.yandex/${{ env.YANDEX_CONTAINER_REGISTRY }}/app:${{ inputs.RV }}_latest
 
       - name: Login in Yandex Container Registry
         run: |
@@ -73,15 +121,15 @@ jobs:
 
       - name: Push Docker images
         run: |
-          docker push cr.yandex/${{ env.YANDEX_CONTAINER_REGISTRY }}/app:${{ inputs.RV }}_fix${{ env.FIX_VERSION }}
+          docker push cr.yandex/${{ env.YANDEX_CONTAINER_REGISTRY }}/app:${{ inputs.RV }}_fix${{ steps.calculate_fix.outputs.result }}
           docker push cr.yandex/${{ env.YANDEX_CONTAINER_REGISTRY }}/app:${{ inputs.RV }}_latest
 
       - name: Create git tag
         run: |
           git config user.name github-actions
           git config user.email github-actions@github.com
-          git tag v${{ inputs.RV }}_fix${{ env.FIX_VERSION }}
-          git push origin v${{ inputs.RV }}_fix${{ env.FIX_VERSION }}
+          git tag v${{ inputs.RV }}_fix${{ steps.calculate_fix.outputs.result }}
+          git push origin v${{ inputs.RV }}_fix${{ steps.calculate_fix.outputs.result }}
 
       - name: Get commits since last tag
         id: get_commits
@@ -91,14 +139,6 @@ jobs:
           echo "commits<<EOF" >> $GITHUB_OUTPUT
           echo "$COMMITS" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-
-      - name: Find related issue
-        id: find_issue
-        run: |
-          # Ищем issue, связанную с этим релизом (по номеру версии в заголовке)
-          ISSUE_TITLE="Release V${{ inputs.RV }}"
-          echo "Looking for issue with title: $ISSUE_TITLE"
-          echo "issue_title=$ISSUE_TITLE" >> $GITHUB_OUTPUT
 
       - name: Add fix release comment to issue
         uses: actions/github-script@v6
@@ -118,18 +158,18 @@ jobs:
             );
 
             if (!targetIssue) {
-              console.log('No matching issue found');
+              core.setFailed('No matching issue found');
               return;
             }
 
             const commitList = `${{ steps.get_commits.outputs.commits }}`;
-            const dockerImage = `cr.yandex/${{ env.YANDEX_CONTAINER_REGISTRY }}/app:${{ inputs.RV }}_fix${{ env.FIX_VERSION }}`;
+            const dockerImage = `cr.yandex/${{ env.YANDEX_CONTAINER_REGISTRY }}/app:${{ inputs.RV }}_fix${{ steps.calculate_fix.outputs.result }}`;
 
             const commentBody = `
             ## Fix Release Information
             - **Date**: ${new Date().toISOString()}
             - **Author**: **[${context.actor}](https://github.com/${context.actor})**
-            - **Fix Version**: v${{ inputs.RV }}_fix${{ env.FIX_VERSION }}
+            - **Fix Version**: v${{ inputs.RV }}_fix${{ steps.calculate_fix.outputs.result }}
 
             ## Changes since last release:
             ${commitList}
