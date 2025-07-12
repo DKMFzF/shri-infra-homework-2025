@@ -82,7 +82,7 @@ jobs:
               }
 
               const commentBody = `Application on the server
-              **Version**: ${LeleaseVersion}
+              **Version**: ${releaseVersion}
               **Date**: ${new Date().toLocaleString('ru-RU')}
               **Author**: @${context.actor}
               **Docker image**: \`cr.yandex/${{ env.YANDEX_CONTAINER_REGISTRY }}/app:${releaseVersion}_latest\``;
