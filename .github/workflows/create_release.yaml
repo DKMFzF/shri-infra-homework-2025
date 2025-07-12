@@ -123,13 +123,13 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               body: `### Release Fix Details
-**Date**: ${new Date().toISOString()}
-**Author**: ${context.actor}
+              **Date**: ${new Date().toISOString()}
+              **Author**: ${context.actor}
 
-**Commits since last release**:
-${${{ steps.get_commits.outputs.commits }}}
+              **Commits since last release**:
+              ${${{ steps.get_commits.outputs.commits }}}
 
-**Docker Image**:
-\`cr.yandex/${process.env.YANDEX_CONTAINER_REGISTRY}/app:${process.env.VERSION}\`
+              **Docker Image**:
+              \`cr.yandex/${process.env.YANDEX_CONTAINER_REGISTRY}/app:${process.env.VERSION}\`
               `
             });
