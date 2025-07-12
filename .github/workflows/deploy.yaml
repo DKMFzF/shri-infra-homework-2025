@@ -65,32 +65,29 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            // Ищем issue, содержащее версию релиза в заголовке
             const { data: issues } = await github.rest.issues.listForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              state: 'all', // Ищем среди открытых и закрытых issues
+              state: 'open',
               sort: 'created',
               direction: 'desc'
             });
-            
-            const releaseVersion = '${{ inputs.RV }}';
+
             const targetIssue = issues.find(issue => 
-              issue.title.includes(releaseVersion) || 
-              issue.body.includes(releaseVersion)
+              issue.title.includes('${{ steps.find_issue.outputs.issue_title }}')
             );
 
             if (!targetIssue) {
-              console.log('Не найдено issue, связанного с этой версией релиза');
+              core.setFailed('No matching issue found');
               return;
             }
 
             const commentBody = `🚀 Релиз успешно задеплоен!
             
-            **Версия**: ${releaseVersion}
+            **Версия**: ${inputs.RV}
             **Дата**: ${new Date().toLocaleString()}
             **Выполнил**: @${context.actor}
-            **Docker образ**: \`cr.yandex/${{ env.YANDEX_CONTAINER_REGISTRY }}/app:${releaseVersion}_latest\`
+            **Docker образ**: \`cr.yandex/${{ env.YANDEX_CONTAINER_REGISTRY }}/app:${inputs.RV}_latest\`
             
             Поздравляю с успешным релизом! 🎉`;
 
