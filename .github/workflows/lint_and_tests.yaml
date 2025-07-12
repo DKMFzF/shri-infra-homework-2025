@@ -6,6 +6,7 @@ on:
       - opened
       - edited
       - synchronize
+
 jobs:
   install:
     name: Install dependencies
@@ -53,9 +54,7 @@ jobs:
 
   test:
     name: Test Code
-    needs:
-      - install
-      - lint
+    needs: install
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
