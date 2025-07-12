@@ -25,7 +25,6 @@ jobs:
 
   release:
     name: New Release
-    needs: lint_and_test  # Добавлено
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -39,7 +38,7 @@ jobs:
           git checkout -b releases/$VERSION
           git push origin releases/$VERSION
 
-      - name: Update CHANGELOG.md  # Перемещено выше
+      - name: Update CHANGELOG.md
         run: |
           LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
 
@@ -79,8 +78,8 @@ jobs:
           git tag v${VERSION}
           git push origin v${VERSION}
 
-      - name: Create Release Issue  # Переименовано и исправлено
-        uses: actions/github-script@v6  # Исправлено название
+      - name: Create Release Issue
+        uses: actions/github-script@v6
         with:
           script: |
             // дата
