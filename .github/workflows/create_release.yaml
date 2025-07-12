@@ -61,21 +61,39 @@ jobs:
           git checkout -b releases/$VERSION
           git push origin releases/$VERSION
 
-      #- name: Update CHANGELOG.md
-        #run: |
-          #echo "## v${VERSION} — $(date)" > temp_changelog.md
-          #echo "${{ steps.commits.outputs.commits }}" >> temp_changelog.md
-          #echo "" >> temp_changelog.md
-
-          #if [ -f CHANGELOG.md ]; then
-            #cat CHANGELOG.md >> temp_changelog.md
-          #fi
-
-          #mv temp_changelog.md CHANGELOG.md
-
-          #it add CHANGELOG.md
-          #git commit -m "chore: update changelog for v${VERSION}"
-          #git push origin main
+      - name: Update CHANGELOG.md
+        run: |
+          # Получаем предыдущий тег
+          PREV_TAG=$(git describe --tags --abbrev=0 $VERSION^ 2>/dev/null || echo "")
+          
+          # Формируем диапазон коммитов
+          if [ -n "$PREV_TAG" ]; then
+            RANGE="$PREV_TAG..HEAD"
+          else
+            RANGE="HEAD"
+          fi
+          
+          # Получаем список коммитов
+          COMMITS=$(git log $RANGE --pretty=format:'- %s (%an)')
+          
+          # Формируем новую запись в CHANGELOG
+          echo "## $VERSION ($(date +'%Y-%m-%d'))" > new_changelog.md
+          echo "" >> new_changelog.md
+          echo "$COMMITS" >> new_changelog.md
+          echo "" >> new_changelog.md
+          
+          # Объединяем с существующим CHANGELOG.md
+          if [ -f CHANGELOG.md ]; then
+            cat new_changelog.md CHANGELOG.md > CHANGELOG.tmp
+            mv CHANGELOG.tmp CHANGELOG.md
+          else
+            mv new_changelog.md CHANGELOG.md
+          fi
+          
+          # Коммитим и пушим изменения в releases ветку
+          git add CHANGELOG.md
+          git commit -m "chore: update changelog for v${VERSION}"
+          git push origin releases/$VERSION
 
       - name: Build Docker Image
         run: |
@@ -141,20 +159,4 @@ jobs:
 
               `
             });
-
-      - name: Update CHANGELOG.md
-        run: |
-          echo "## v${VERSION} — $(date)" > temp_changelog.md
-          echo "${{ steps.commits.outputs.commits }}" >> temp_changelog.md
-          echo "" >> temp_changelog.md
-
-          if [ -f CHANGELOG.md ]; then
-            cat CHANGELOG.md >> temp_changelog.md
-          fi
-
-          mv temp_changelog.md CHANGELOG.md
-
-          it add CHANGELOG.md
-          git commit -m "chore: update changelog for v${VERSION}"
-          git push origin main
 
