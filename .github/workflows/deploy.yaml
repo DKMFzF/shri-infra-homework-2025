@@ -29,26 +29,15 @@ jobs:
         run: |
           docker pull "cr.yandex/$YANDEX_CONTAINER_REGISTRY/app:${{ inputs.RV }}_latest" || \
             { echo "Error: Docker image not found"; exit 1; }
-
       - name: Deploy via SSH
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.0.0  # Используем конкретную версию
         with:
           host: ${{ secrets.SERVER_IP }}
           username: ${{ secrets.SERVER_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            sudo usermod -aG docker $USER || true
-            echo "$YANDEX_OAUTH_TOKEN" | sudo docker login \
-              --username oauth \
-              --password-stdin \
-              cr.yandex
-            
-            # Получаем образ и запускаем контейнер
-            sudo docker pull "cr.yandex/$YANDEX_CONTAINER_REGISTRY/app:${{ inputs.RV }}_latest"
+            echo "${{ secrets.YANDEX_OAUTH_TOKEN }}" | sudo docker login --username oauth --password-stdin cr.yandex
+            sudo docker pull cr.yandex/${{ secrets.YANDEX_CONTAINER_REGISTRY }}/app:${{ github.event.inputs.RV }}_latest
             sudo docker stop app || true
             sudo docker rm app || true
-            sudo docker run -d \
-              --restart unless-stopped \
-              --name app \
-              -p 3000:3000 \
-              "cr.yandex/$YANDEX_CONTAINER_REGISTRY/app:${{ inputs.RV }}_latest"
+            sudo docker run -d --name app -p 3000:3000 cr.yandex/${{ secrets.YANDEX_CONTAINER_REGISTRY }}/app:${{ github.event.inputs.RV }}_latest
