@@ -47,11 +47,6 @@ jobs:
             sudo docker rm app || true
             sudo docker run -d --name app -p 3000:3000 cr.yandex/${{ secrets.YANDEX_CONTAINER_REGISTRY }}/app:${{ github.event.inputs.RV }}_latest
 
-      #- name: Find related issue
-        #id: find_issue
-        #run: |
-          ## Поиск issue по версии релиза
-          #echo "issue_title=Release V${{ inputs.RV }}" >> $GITHUB_OUTPUT
       - name: Find issue
         id: find_issue
         run: |
@@ -88,12 +83,12 @@ jobs:
 
               const commentBody = `🚀 Релиз успешно задеплоен!
               
-      **Версия**: ${releaseVersion}
-      **Дата**: ${new Date().toLocaleString('ru-RU')}
-      **Выполнил**: @${context.actor}
-      **Docker образ**: \`cr.yandex/${{ env.YANDEX_CONTAINER_REGISTRY }}/app:${releaseVersion}_latest\`
+              **Версия**: ${releaseVersion}
+              **Дата**: ${new Date().toLocaleString('ru-RU')}
+              **Выполнил**: @${context.actor}
+              **Docker образ**: \`cr.yandex/${{ env.YANDEX_CONTAINER_REGISTRY }}/app:${releaseVersion}_latest\`
 
-      Поздравляю с успешным релизом! 🎉`;
+              Поздравляю с успешным релизом! 🎉`;
 
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
