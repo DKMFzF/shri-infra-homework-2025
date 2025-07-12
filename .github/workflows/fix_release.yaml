@@ -37,13 +37,12 @@ jobs:
 
   fix-release:
     name: Fix Release
-    needs: [lint, test]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       
       - name: Checkout release branch
-        run: git checkout release/${{ inputs.RV }}
+        run: git checkout releases/${{ inputs.RV }}
 
       - name: Build and tag Docker image
         run: |
