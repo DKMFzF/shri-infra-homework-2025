@@ -57,6 +57,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: releases/${{ inputs.RV }}
+          fetch-depth: 0
       
       - name: Build and tag Docker image
         run: |
@@ -86,24 +87,60 @@ jobs:
         id: get_commits
         run: |
           LAST_TAG=$(git describe --tags --abbrev=0)
-          COMMITS=$(git log --pretty=format:"%h - %an, %ar : %s" $LAST_TAG..HEAD)
+          COMMITS=$(git log --pretty=format:"- %s (%h)" $LAST_TAG..HEAD)
           echo "commits<<EOF" >> $GITHUB_OUTPUT
           echo "$COMMITS" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Create release summary
+      - name: Find related issue
+        id: find_issue
         run: |
-          echo "Fix release details:" >> summary.md
-          echo "- Date: $(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> summary.md
-          echo "- Author: $GITHUB_ACTOR" >> summary.md
-          echo "- Commits since last release:" >> summary.md
-          echo '```' >> summary.md
-          echo "${{ steps.get_commits.outputs.commits }}" >> summary.md
-          echo '```' >> summary.md
-          echo "- Docker image: cr.yandex/${{ env.YANDEX_CONTAINER_REGISTRY }}/app:${{ inputs.RV }}_fix${{ env.FIX_VERSION }}" >> summary.md
+          # Ищем issue, связанную с этим релизом (по номеру версии в заголовке)
+          ISSUE_TITLE="Release V${{ inputs.RV }}"
+          echo "Looking for issue with title: $ISSUE_TITLE"
+          echo "issue_title=$ISSUE_TITLE" >> $GITHUB_OUTPUT
 
-      - name: Upload release summary
-        uses: actions/upload-artifact@v4
+      - name: Add fix release comment to issue
+        uses: actions/github-script@v6
         with:
-          name: release-summary
-          path: summary.md
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              sort: 'created',
+              direction: 'desc'
+            });
+
+            const targetIssue = issues.find(issue => 
+              issue.title.includes('${{ steps.find_issue.outputs.issue_title }}')
+            );
+
+            if (!targetIssue) {
+              console.log('No matching issue found');
+              return;
+            }
+
+            const commitList = `${{ steps.get_commits.outputs.commits }}`;
+            const dockerImage = `cr.yandex/${{ env.YANDEX_CONTAINER_REGISTRY }}/app:${{ inputs.RV }}_fix${{ env.FIX_VERSION }}`;
+
+            const commentBody = `
+            ## Fix Release Information
+            - **Date**: ${new Date().toISOString()}
+            - **Author**: **[${context.actor}](https://github.com/${context.actor})**
+            - **Fix Version**: v${{ inputs.RV }}_fix${{ env.FIX_VERSION }}
+
+            ## Changes since last release:
+            ${commitList}
+
+            ## Link on Docker Image:
+            \`${dockerImage}\`
+            `;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: targetIssue.number,
+              body: commentBody
+            });
