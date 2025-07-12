@@ -1,4 +1,4 @@
-name: Deploy Poriject
+name: Deploy Project
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ env:
   YANDEX_OAUTH_TOKEN: ${{ secrets.YANDEX_OAUTH_TOKEN }}
 
 jobs:
-  deploy:  # Исправлено: должно быть ID job, а не ключ 'name'
+  deploy:  
     name: Deploy Application
     runs-on: ubuntu-latest
     steps:
@@ -29,15 +29,14 @@ jobs:
         run: |
           docker pull "cr.yandex/$YANDEX_CONTAINER_REGISTRY/app:${{ inputs.RV }}_latest" || \
             { echo "Error: Docker image not found"; exit 1; }
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.0.0  # Используем конкретную версию
+      
+      - name: Download image in VM and Deploy here
+        uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.SERVER_IP }}
           username: ${{ secrets.SERVER_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            #echo "${{ secrets.YANDEX_OAUTH_TOKEN }}" | sudo docker login --username oauth --password-stdin cr.yandex
-
             echo "${{ secrets.YANDEX_OAUTH_TOKEN }}" | sudo docker login \
               --username oauth \
               --password-stdin \
@@ -47,3 +46,52 @@ jobs:
             sudo docker stop app || true
             sudo docker rm app || true
             sudo docker run -d --name app -p 3000:3000 cr.yandex/${{ secrets.YANDEX_CONTAINER_REGISTRY }}/app:${{ github.event.inputs.RV }}_latest
+
+      - name: Find related issue
+        id: find_issue
+        run: |
+          # Здесь должна быть логика поиска issue
+          echo "issue_title=Your Issue Title" >> $GITHUB_OUTPUT
+
+      - name: Calculate fix version
+        id: calculate_fix
+        run: |
+          # Здесь должна быть логика вычисления версии фикса
+          echo "result=1" >> $GITHUB_OUTPUT
+
+      - name: Update Issue
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              sort: 'created',
+              direction: 'desc'
+            });
+           
+            const targetIssue = issues.find(issue => 
+              issue.title.includes('${{ steps.find_issue.outputs.issue_title }}')
+            );
+
+            if (!targetIssue) {
+              core.setFailed('No matching issue found');
+              return;
+            }
+
+            const dockerImage = `cr.yandex/${{ env.YANDEX_CONTAINER_REGISTRY }}/app:${{ inputs.RV }}_fix${{ steps.calculate_fix.outputs.result }}`;
+
+            let commentBody = `## Release Deploy (Победа!!)
+            - **Date**: ${new Date().toISOString()}
+            - **Author**: **[${context.actor}](https://github.com/${context.actor})**
+            - **Fix Version**: v${{ inputs.RV }}_fix${{ steps.calculate_fix.outputs.result }}
+            - **Docker Image**: \`${dockerImage}\``;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: targetIssue.number,
+              body: commentBody
+            });
