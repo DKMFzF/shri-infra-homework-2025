@@ -63,26 +63,21 @@ jobs:
 
       - name: Update CHANGELOG.md
         run: |
-          # Получаем предыдущий тег
           PREV_TAG=$(git describe --tags --abbrev=0 $VERSION^ 2>/dev/null || echo "")
           
-          # Формируем диапазон коммитов
           if [ -n "$PREV_TAG" ]; then
             RANGE="$PREV_TAG..HEAD"
           else
             RANGE="HEAD"
           fi
           
-          # Получаем список коммитов
           COMMITS=$(git log $RANGE --pretty=format:'- %s (%an)')
           
-          # Формируем новую запись в CHANGELOG
           echo "## $VERSION ($(date +'%Y-%m-%d'))" > new_changelog.md
           echo "" >> new_changelog.md
           echo "$COMMITS" >> new_changelog.md
           echo "" >> new_changelog.md
           
-          # Объединяем с существующим CHANGELOG.md
           if [ -f CHANGELOG.md ]; then
             cat new_changelog.md CHANGELOG.md > CHANGELOG.tmp
             mv CHANGELOG.tmp CHANGELOG.md
@@ -90,7 +85,6 @@ jobs:
             mv new_changelog.md CHANGELOG.md
           fi
           
-          # Коммитим и пушим изменения в releases ветку
           git add CHANGELOG.md
           git commit -m "chore: update changelog for v${VERSION}"
           git push origin releases/$VERSION
@@ -121,7 +115,6 @@ jobs:
         uses: actions/github-script@v6
         with:
           script: |
-            // дата
             const { data: latestRelease } = await github.rest.repos.getLatestRelease({
               owner: context.repo.owner,
               repo: context.repo.repo
@@ -134,12 +127,10 @@ jobs:
               per_page: 100
             });
 
-            // список коммитов
             const commitList = commits.map(commit =>
               `- ${commit.commit.message.split('\n')[0]} (${commit.sha.substring(0, 7)})`
             ).join('\n');
 
-            // заполнялка
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
