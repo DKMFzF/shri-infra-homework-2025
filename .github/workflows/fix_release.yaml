@@ -51,7 +51,6 @@ jobs:
   fix-release:
     name: Fix Release
     runs-on: ubuntu-latest
-    needs: [lint, test]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -88,14 +87,12 @@ jobs:
               return;
             }
 
-            // Получаем все комментарии к issue
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: targetIssue.number
             });
 
-            // Считаем количество существующих фиксов
             const fixComments = comments.filter(comment => 
               comment.body.includes('Fix Version') && 
               comment.body.includes(`v${{ inputs.RV }}_fix`)
