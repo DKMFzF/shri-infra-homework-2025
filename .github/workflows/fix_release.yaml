@@ -31,7 +31,6 @@ jobs:
       - name: Run linter
         run: npm run lint
 
-
   test:
     name: Test Code
     runs-on: ubuntu-latest
@@ -50,67 +49,61 @@ jobs:
       - name: Run tests
         run: npm run test
 
-    fix-release:
-        name: Fix Release
-        runs-on: ubuntu-latest
-        steps:
-          - uses: actions/checkout@v4
-            with:
-              ref: releases/${{ inputs.RV }}
-          
-          #- name: Checkout release branch
-            #run: git checkout release/${{ inputs.RV }}
+  fix-release:
+    name: Fix Release
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: releases/${{ inputs.RV }}
+      
+      - name: Build and tag Docker image
+        run: |
+          docker build -t cr.yandex/${{ env.YANDEX_CONTAINER_REGISTRY }}/app:${{ inputs.RV }}_fix${{ env.FIX_VERSION }} .
+          docker tag cr.yandex/${{ env.YANDEX_CONTAINER_REGISTRY }}/app:${{ inputs.RV }}_fix${{ env.FIX_VERSION }} cr.yandex/${{ env.YANDEX_CONTAINER_REGISTRY }}/app:${{ inputs.RV }}_latest
 
-          - name: Build and tag Docker image
-            run: |
-              docker build -t cr.yandex/${{ env.YANDEX_CONTAINER_REGISTRY }}/app:${{ inputs.RV }}_fix${{ env.FIX_VERSION }} .
-              docker tag cr.yandex/${{ env.YANDEX_CONTAINER_REGISTRY }}/app:${{ inputs.RV }}_fix${{ env.FIX_VERSION }} cr.yandex/${{ env.YANDEX_CONTAINER_REGISTRY }}/app:${{ inputs.RV }}_latest
+      - name: Login in Yandex Container Registry
+        run: |
+          echo ${YANDEX_OAUTH_TOKEN} | docker login \
+            --username oauth \
+            --password-stdin \
+            cr.yandex
 
+      - name: Push Docker images
+        run: |
+          docker push cr.yandex/${{ env.YANDEX_CONTAINER_REGISTRY }}/app:${{ inputs.RV }}_fix${{ env.FIX_VERSION }}
+          docker push cr.yandex/${{ env.YANDEX_CONTAINER_REGISTRY }}/app:${{ inputs.RV }}_latest
 
-          - name: Login in Yandex Container Registry
-            run: |
-              echo ${YANDEX_OAUTH_TOKEN}|docker login \
-                --username oauth \
-                --password-stdin \
-                cr.yandex
+      - name: Create git tag
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git tag v${{ inputs.RV }}_fix${{ env.FIX_VERSION }}
+          git push origin v${{ inputs.RV }}_fix${{ env.FIX_VERSION }}
 
+      - name: Get commits since last tag
+        id: get_commits
+        run: |
+          LAST_TAG=$(git describe --tags --abbrev=0)
+          COMMITS=$(git log --pretty=format:"%h - %an, %ar : %s" $LAST_TAG..HEAD)
+          echo "commits<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMITS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
-          - name: Push Docker images
-            run: |
-              docker push cr.yandex/${{ env.YANDEX_CONTAINER_REGISTRY }}/app:${{ inputs.RV }}_fix${{ env.FIX_VERSION }}
-              docker push cr.yandex/${{ env.YANDEX_CONTAINER_REGISTRY }}/app:${{ inputs.RV }}_latest
+      - name: Create release summary
+        run: |
+          echo "Fix release details:" >> summary.md
+          echo "- Date: $(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> summary.md
+          echo "- Author: $GITHUB_ACTOR" >> summary.md
+          echo "- Commits since last release:" >> summary.md
+          echo '```' >> summary.md
+          echo "${{ steps.get_commits.outputs.commits }}" >> summary.md
+          echo '```' >> summary.md
+          echo "- Docker image: cr.yandex/${{ env.YANDEX_CONTAINER_REGISTRY }}/app:${{ inputs.RV }}_fix${{ env.FIX_VERSION }}" >> summary.md
 
-          - name: Create git tag
-            run: |
-              git config user.name github-actions
-              git config user.email github-actions@github.com
-              git tag v${inputs.RV}_fix${FIX_NUMBER}
-              git push origin v${inputs.RV}_fix${FIX_NUMBER}
-
-          - name: Get commits since last tag
-            id: get_commits
-            run: |
-              LAST_TAG=$(git describe --tags --abbrev=0)
-              COMMITS=$(git log --pretty=format:"%h - %an, %ar : %s" $LAST_TAG..HEAD)
-              echo "commits<<EOF" >> $GITHUB_OUTPUT
-              echo "$COMMITS" >> $GITHUB_OUTPUT
-              echo "EOF" >> $GITHUB_OUTPUT
-
-          - name: Add comment to issue
-            uses: actions/github-script@v6
-            with:
-              script: |
-                github.rest.issues.createComment({
-                  issue_number: context.payload.inputs.issue_number,
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  body: `Fix release details:
-                  - Date: ${new Date().toISOString()}
-                  - Author: ${context.actor}
-                  - Commits since last release:
-                  \`\`\`
-                  ${{ steps.get_commits.outputs.commits }}
-                  \`\`\`
-                  - Docker image: cr.yandex/${{ env.YANDEX_CONTAINER_REGISTRY }}/app:${{ inputs.RV }}_fix${{ env.FIX_VERSION }}`
-                })
-
+      - name: Upload release summary
+        uses: actions/upload-artifact@v3
+        with:
+          name: release-summary
+          path: summary.md
