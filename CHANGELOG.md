@@ -1,0 +1,23 @@
+# Version 6 (2025-07-12)
+
+- fix: попытка фикса (2e5c56e)
+- feat: added issue (289d836)
+- feat: added (61dcfdc)
+- ci: added ver (c514a32)
+- ci: added comment (59ea754)
+- fix: commit after push docker (ec34acd)
+- feat: added create_release.yaml (424fef3)
+- ci: update ci/cd workflow for lit_and_test (0b4246a)
+- ci: update workflow lint and tests (6bf04a5)
+- ci: added cache for workflow ling_and_test.yaml (c5d5844)
+- faet: added file_change.txt (0db3375)
+- ci: delete build_and_delpoy.yaml (5d36f64)
+- ci: delete build_and_delpoy.yaml (9effd29)
+- ci: added lint_and_tests ci/cd (d32764d)
+- feat: added dockerfile build (58370fc)
+- Update README.md (8255c7d)
+- Fix type by IgorBarbashov (130ca2e)
+- chore: Fix typo (0394b86)
+- Add infra homework (466eb3c)
+
+
