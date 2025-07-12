@@ -47,11 +47,18 @@ jobs:
             sudo docker rm app || true
             sudo docker run -d --name app -p 3000:3000 cr.yandex/${{ secrets.YANDEX_CONTAINER_REGISTRY }}/app:${{ github.event.inputs.RV }}_latest
 
-      - name: Find related issue
+      #- name: Find related issue
+        #id: find_issue
+        #run: |
+          ## Поиск issue по версии релиза
+          #echo "issue_title=Release V${{ inputs.RV }}" >> $GITHUB_OUTPUT
+
+      - name:
         id: find_issue
         run: |
-          # Поиск issue по версии релиза
-          echo "issue_title=Release V${{ inputs.RV }}" >> $GITHUB_OUTPUT
+          ISSUE_TITLE="Release V${{ inputs.RV }}"
+          echo "Looking for issue with title: $ISSUE_TITLE"
+          echo "issue_title=$ISSUE_TITLE" >> $GITHUB_OUTPUT
 
       - name: Create release comment
         uses: actions/github-script@v6
