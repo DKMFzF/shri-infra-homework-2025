@@ -38,7 +38,7 @@ jobs:
           script: |
             #echo "${{ secrets.YANDEX_OAUTH_TOKEN }}" | sudo docker login --username oauth --password-stdin cr.yandex
 
-            echo "${{ YANDEX_OAUTH_TOKEN }}" | sudo docker login \
+            echo "${{ secrets.YANDEX_OAUTH_TOKEN }}" | sudo docker login \
               --username oauth \
               --password-stdin \
               cr.yandex
