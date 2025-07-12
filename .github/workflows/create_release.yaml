@@ -64,7 +64,7 @@ jobs:
       - name: Update CHANGELOG.md
         run: |
           LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-
+          
           if [ -z "$LATEST_TAG" ]; then
             COMMITS=$(git log --pretty=format:"- %s (%h)")
           else
@@ -72,12 +72,19 @@ jobs:
           fi
 
           echo -e "# Version $VERSION ($(date '+%Y-%m-%d'))\n\n$COMMITS\n\n$(cat CHANGELOG.md 2>/dev/null || echo '# Changelog')" > CHANGELOG.new
-
-          mv CHANGELOG.new CHANGELOG.md
-
-          git add CHANGELOG.md
-          git commit -m "Update CHANGELOG.md for version $VERSION"
-          git push origin releases/$VERSION
+          
+          if ! diff CHANGELOG.md CHANGELOG.new >/dev/null 2>&1; then
+            mv CHANGELOG.new CHANGELOG.md
+            git config user.name "github-actions"
+            git config user.email "github-actions@github.com"
+            git add CHANGELOG.md
+            git commit -m "Update CHANGELOG.md for version $VERSION"
+            git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+            git push origin releases/$VERSION
+          else
+            echo "No changes in CHANGELOG.md"
+            rm CHANGELOG.new
+          fi
 
       - name: Build Docker Image
         run: |
