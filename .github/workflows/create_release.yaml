@@ -108,11 +108,12 @@ jobs:
               body: `## Release Information
               - Date: ${new Date().toISOString()}
               - Author Release: ${context.actor}
-              - Number version: ${process.env.VERSION}
+              - Number version: v${process.env.VERSION}
 
               ## Changes since last release:
 
               ${commitList}
+
 
               ## Link on Docker Image:
               \`cr.yandex/${process.env.YANDEX_CONTAINER_REGISTRY}/app:${process.env.VERSION}\`
