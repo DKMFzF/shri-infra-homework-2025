@@ -115,8 +115,8 @@ jobs:
               ${commitList}
 
 
-              ## Link on Docker Image:
-              \`cr.yandex/${process.env.YANDEX_CONTAINER_REGISTRY}/app:${process.env.VERSION}\`
+            ## Link on Docker Image:
+            \`cr.yandex/${process.env.YANDEX_CONTAINER_REGISTRY}/app:${process.env.VERSION}\`
 
               `
             });
