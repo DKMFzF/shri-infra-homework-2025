@@ -105,19 +105,18 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               title: `Release V${process.env.VERSION}`,
-              body: `
+              body: `## Release Information
+              - Date: ${new Date().toISOString()}
+              - Author Release: ${context.actor}
+              - Number version: ${process.env.VERSION}
 
-                ## Release Information
-                - Date: ${new Date().toISOString()}
-                - Author Release: ${context.actor}
-                - Number version: ${process.env.VERSION}
+              ## Changes since last release:
 
-                ## Changes since last release:
+              ${commitList}
 
-                ${commitList}
+              ## Link on Docker Image:
+              \`cr.yandex/${process.env.YANDEX_CONTAINER_REGISTRY}/app:${process.env.VERSION}\`
 
-                **Link on Docker Image:**
-                [cr.yandex/${process.env.YANDEX_CONTAINER_REGISTRY}/app:${process.env.VERSION}](cr.yandex/${process.env.YANDEX_CONTAINER_REGISTRY}/app:${process.env.VERSION})
               `
             });
 
