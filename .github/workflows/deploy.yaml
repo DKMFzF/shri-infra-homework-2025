@@ -12,38 +12,40 @@ env:
   YANDEX_OAUTH_TOKEN: ${{ secrets.YANDEX_OAUTH_TOKEN }}
 
 jobs:
-  name: Deploy App
-  runs-on: ubuntu-latest
-  steps:
+  deploy:  # Исправлено: должно быть ID job, а не ключ 'name'
+    name: Deploy Application
+    runs-on: ubuntu-latest
+    steps:
       - uses: actions/checkout@v4
 
-      - name: Login in Yandex Container Registry
+      - name: Login to Yandex Container Registry
         run: |
-          echo ${YANDEX_OAUTH_TOKEN} | docker login \
+          echo "$YANDEX_OAUTH_TOKEN" | docker login \
             --username oauth \
             --password-stdin \
             cr.yandex
 
-      - name: Deploy App in Server
+      - name: Verify Docker image exists
         run: |
-          docker pull cr.yandex/${ YANDEX_CONTAINER_REGISTRY }/app:${ inputs.RV }_latest \
-          || ( echo "Docker latest image not found" & exit 1 )
+          docker pull "cr.yandex/$YANDEX_CONTAINER_REGISTRY/app:${{ inputs.RV }}_latest" || \
+            { echo "Error: Docker image not found"; exit 1; }
 
-      - name: Connect on SSH
+      - name: Deploy via SSH
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.SERVER_IP }}
           username: ${{ secrets.SERVER_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-        script: |
-          echo ${YANDEX_OAUTH_TOKEN} | docker login \
-            --username oauth \
-            --password-stdin \
-            cr.yandex
-          docker pull cr.yandex/${YANDEX_CONTAINER_REGISTRY}/app:${inputs.RV}_latest
-          docker stop app || true
-          docker rm app || true
-          docker run -d --name app -p 3000:3000 "cr.yandex/${YANDEX_CONTAINER_REGISTRY}/app:${inputs.RV}_latest"
-
-
+          script: |
+            echo "$YANDEX_OAUTH_TOKEN" | docker login \
+              --username oauth \
+              --password-stdin \
+              cr.yandex
+            docker pull "cr.yandex/$YANDEX_CONTAINER_REGISTRY/app:${{ inputs.RV }}_latest"
+            docker stop app || true
+            docker rm app || true
+            docker run -d --restart unless-stopped \
+              --name app \
+              -p 3000:3000 \
+              "cr.yandex/$YANDEX_CONTAINER_REGISTRY/app:${{ inputs.RV }}_latest"
 
