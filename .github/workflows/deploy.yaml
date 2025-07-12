@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       RV:
-        description: "Версия релиза (например, 1.0.0)"
+        description: "Release -ver fix"
         required: true
 
 env:
