@@ -104,8 +104,8 @@ jobs:
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: `Release ${process.env.VERSION}`,
-              body: `
+              title: `Release V${process.env.VERSION}`,
+              body:
                 **Release Information**
                 - Date: ${new Date().toISOString()}
                 - Author: ${context.actor}
@@ -116,6 +116,5 @@ jobs:
 
                 **Docker Image:**
                 cr.yandex/${process.env.YANDEX_CONTAINER_REGISTRY}/app:${process.env.VERSION}
-              `
             });
 
