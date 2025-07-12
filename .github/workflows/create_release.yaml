@@ -6,8 +6,7 @@ on:
 env:
   VERSION: ${{ github.run_number }}
   YANDEX_CONTAINER_REGISTRY: ${{ secrets.YANDEX_CONTAINER_REGISTRY }}
-  YANDEX_OAUTH_TOKEN: ${{ secrets.YANDEX_OAUTH_TOKEN  }}
-
+  YANDEX_OAUTH_TOKEN: ${{ secrets.YANDEX_OAUTH_TOKEN }}
 
 jobs:
   lint_and_test:
@@ -15,112 +14,109 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
-
       - run: npm ci
       - run: npm run lint
       - run: npm run test
 
   release:
-      name: New Release
-      runs-on: ubuntu-latest
-      steps:
-        - uses: actions/checkout@v4
-          with:
-            fetch-depth: 0
+    name: New Release
+    needs: lint_and_test  # Добавлено
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-        - name: Release Branch
-          run: |
-                git config user.name "github-actions"
-                git config user.email "github-actions@github.com"
-                git checkout -b releases/$VERSION
-                git push origin releases/$VERSION
-        
-        - name: Build Docker Image
-          run: |
-            docker build -t cr.yandex/${YANDEX_CONTAINER_REGISTRY}/app:${VERSION} .
-            docker tag cr.yandex/${YANDEX_CONTAINER_REGISTRY}/app:${VERSION} cr.yandex/${YANDEX_CONTAINER_REGISTRY}/app:${VERSION}_latest
+      - name: Release Branch
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git checkout -b releases/$VERSION
+          git push origin releases/$VERSION
 
-        - name: Login in Yandex Container Registry
-          run: |
-            echo ${YANDEX_OAUTH_TOKEN}|docker login \
-              --username oauth \
-              --password-stdin \
-              cr.yandex
+      - name: Update CHANGELOG.md  # Перемещено выше
+        run: |
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
 
-        - name: Push Docker Images
-          run: |
-            docker push cr.yandex/${YANDEX_CONTAINER_REGISTRY}/app:${VERSION}
-            docker push cr.yandex/${YANDEX_CONTAINER_REGISTRY}/app:${VERSION}_latest
-        
-        - name: Added Version Tag
-          run: |
-            git tag v${VERSION}
-            git push origin v${VERSION}
-        
-        - name: Added Release Issue
-          uses: actions/github-scripts@v6
-          with:
-            script: |
-              # дата
-              const { data: latestRelease } = await github.rest.repos.getLatestRelease({
-                owner: context.repo.owner,
-                repo: context.repo.repo
-              }).catch(() => ({ data: null }));
-              
-              # автор реализа
-              const { data: commits } = await github.rest.repos.listCommits({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                sha: latestRelease ? latestRelease.tag_name : 'main',
-                per_page: 100
-              });
+          if [ -z "$LATEST_TAG" ]; then
+            COMMITS=$(git log --pretty=format:"- %s (%h)")
+          else
+            COMMITS=$(git log $LATEST_TAG..HEAD --pretty=format:"- %s (%h)")
+          fi
 
-              # список коммитов
-              const commitList = commits.map(commit =>
-                `- ${commit.commit.message.split('\n')[0]} (${commit.sha.substring(0, 7)})`
-              ).join('\n');
+          echo -e "# Version $VERSION ($(date '+%Y-%m-%d'))\n\n$COMMITS\n\n$(cat CHANGELOG.md 2>/dev/null || echo '# Changelog')" > CHANGELOG.new
 
-              # заполнялка
-              await github.rest.issues.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                title: `Release ${process.env.VERSION}`,
-                body: `
-                  **Release Information**
-                  - Date: ${new Date().toISOString()}
-                  - Author: ${context.actor}
-                  - Version: ${process.env.VERSION}
+          mv CHANGELOG.new CHANGELOG.md
 
-                  **Changes since last release:**
-                  ${commitList}
+          git add CHANGELOG.md
+          git commit -m "Update CHANGELOG.md for version $VERSION"
+          git push origin releases/$VERSION
 
-                  **Docker Image:**
-                  cr.yandex/${process.env.YANDEX_CONTAINER_REGISTRY}/app:${process.env.VERSION}
-                `
-              });
+      - name: Build Docker Image
+        run: |
+          docker build -t cr.yandex/${YANDEX_CONTAINER_REGISTRY}/app:${VERSION} .
+          docker tag cr.yandex/${YANDEX_CONTAINER_REGISTRY}/app:${VERSION} cr.yandex/${YANDEX_CONTAINER_REGISTRY}/app:${VERSION}_latest
 
-        - name: Update CHANGELOG.md
-          run: |
-            LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+      - name: Login in Yandex Container Registry
+        run: |
+          echo ${YANDEX_OAUTH_TOKEN}|docker login \
+            --username oauth \
+            --password-stdin \
+            cr.yandex
 
-            if [ -z "$LATEST_TAG" ]; then
-              COMMITS=$(git log --pretty=format:"- %s (%h)")
-            else
-              COMMITS=$(git log $LATEST_TAG..HEAD --pretty=format:"- %s (%h)")
-            fi
+      - name: Push Docker Images
+        run: |
+          docker push cr.yandex/${YANDEX_CONTAINER_REGISTRY}/app:${VERSION}
+          docker push cr.yandex/${YANDEX_CONTAINER_REGISTRY}/app:${VERSION}_latest
 
-            echo -e "# Version $VERSION ($(date '+%Y-%m-%d'))\n\n$COMMITS\n\n$(cat CHANGELOG.md 2>/dev/null || echo '# Changelog')" > CHANGELOG.new
+      - name: Added Version Tag
+        run: |
+          git tag v${VERSION}
+          git push origin v${VERSION}
 
-            mv CHANGELOG.new CHANGELOG.md
+      - name: Create Release Issue  # Переименовано и исправлено
+        uses: actions/github-script@v6  # Исправлено название
+        with:
+          script: |
+            // дата
+            const { data: latestRelease } = await github.rest.repos.getLatestRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo
+            }).catch(() => ({ data: null }));
+            
+            const { data: commits } = await github.rest.repos.listCommits({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: latestRelease ? latestRelease.tag_name : 'main',
+              per_page: 100
+            });
 
-            git add CHANGELOG.md
-            git config user.name "github-actions"
-            git config user.email "github-actions@github.com"
-            git commit -m "Update CHANGELOG.md for version $VERSION"
-            git push origin releases/$VERSION
+            // список коммитов
+            const commitList = commits.map(commit =>
+              `- ${commit.commit.message.split('\n')[0]} (${commit.sha.substring(0, 7)})`
+            ).join('\n');
+
+            // заполнялка
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Release ${process.env.VERSION}`,
+              body: `
+                **Release Information**
+                - Date: ${new Date().toISOString()}
+                - Author: ${context.actor}
+                - Version: ${process.env.VERSION}
+
+                **Changes since last release:**
+                ${commitList}
+
+                **Docker Image:**
+                cr.yandex/${process.env.YANDEX_CONTAINER_REGISTRY}/app:${process.env.VERSION}
+              `
+            });
+
