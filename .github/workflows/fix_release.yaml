@@ -162,18 +162,21 @@ jobs:
             const commitList = `${{ steps.get_commits.outputs.commits }}`;
             const dockerImage = `cr.yandex/${{ env.YANDEX_CONTAINER_REGISTRY }}/app:${{ inputs.RV }}_fix${{ steps.calculate_fix.outputs.result }}`;
 
-            const commentBody = `
-            ## Fix Release Information
-            - **Date**: ${new Date().toISOString()}
-            - **Author**: **[${context.actor}](https://github.com/${context.actor})**
-            - **Fix Version**: v${{ inputs.RV }}_fix${{ steps.calculate_fix.outputs.result }}
+            let commentBody = `## Fix Release Information
+- **Date**: ${new Date().toISOString()}
+- **Author**: **[${context.actor}](https://github.com/${context.actor})**
+- **Fix Version**: v${{ inputs.RV }}_fix${{ steps.calculate_fix.outputs.result }}
 
-            ## Changes since last release:
-            ${commitList}
+## Changes since last release:\n`;
 
-            ## Link on Docker Image:
-            \`${dockerImage}\`
-            `;
+            if (commitList && commitList.trim() !== '') {
+              commentBody += `${commitList}\n\n`;
+            } else {
+              commentBody += "No new commits since last release\n\n";
+            }
+
+            commentBody += `## Link on Docker Image:
+\`${dockerImage}\``;
 
             await github.rest.issues.createComment({
               owner: context.repo.owner,
